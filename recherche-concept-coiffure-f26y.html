@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Réservation en ligne — Cizora</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f7f4; min-height: 100vh; }
+    nav { background: #fff; border-bottom: 0.5px solid #e5e3dc; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .cizora-logo { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: #7F77DD; letter-spacing: 0.5px; }
+    .wrap { max-width: 480px; margin: 0 auto; padding: 24px 16px; }
+    .card { background: #fff; border-radius: 16px; border: 0.5px solid #e5e3dc; padding: 20px; margin-bottom: 16px; }
+    .salon-header { display: flex; align-items: center; gap: 16px; }
+    .salon-logo { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; border: 1px solid #e5e3dc; }
+    .salon-initials { width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; }
+    .salon-name { font-size: 18px; font-weight: 600; color: #2c2a24; margin-bottom: 4px; }
+    .salon-addr { font-size: 13px; color: #888; margin-bottom: 6px; }
+    .badge { font-size: 12px; padding: 3px 10px; border-radius: 20px; display: inline-block; }
+    .badge-open { background: #e1f5ee; color: #085041; }
+    .badge-closed { background: #fce8e8; color: #a32d2d; }
+    .section-label { font-size: 11px; font-weight: 600; color: #aaa; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 12px; }
+    .staff-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .pill { padding: 6px 14px; border-radius: 20px; border: 0.5px solid #ddd; background: #fff; color: #666; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+    .pill.active { border-color: var(--brand); background: var(--brand-light); color: var(--brand); }
+    .service-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 0.5px solid #f0ede6; }
+    .service-row:last-child { border-bottom: none; }
+    .svc-name { font-size: 14px; font-weight: 500; color: #2c2a24; }
+    .svc-detail { font-size: 12px; color: #aaa; margin-top: 2px; }
+    .btn { padding: 7px 16px; background: var(--brand); color: #fff; border: none; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
+    .btn-full { width: 100%; padding: 12px; border-radius: 10px; font-size: 14px; margin-top: 16px; }
+    .btn-back { background: none; border: none; color: #aaa; font-size: 13px; cursor: pointer; margin-bottom: 16px; padding: 0; }
+    .dates { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 20px; }
+    .date-btn { min-width: 56px; padding: 8px 4px; border-radius: 10px; border: 0.5px solid #ddd; background: #fff; color: #444; font-size: 12px; cursor: pointer; text-align: center; flex-shrink: 0; }
+    .date-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .heures { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .heure-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #ddd; background: #fff; color: #444; font-size: 13px; cursor: pointer; }
+    .heure-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; }
+    .form-group textarea { resize: none; }
+    .note-box { margin-top: 16px; padding: 10px 14px; background: #f8f7f4; border-radius: 8px; font-size: 12px; color: #aaa; }
+    .footer { text-align: center; margin-top: 24px; font-size: 12px; color: #bbb; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .footer strong { color: #7F77DD; font-weight: 500; }
+    .confirme { text-align: center; padding: 32px 20px; }
+    .confirme .icon { font-size: 48px; margin-bottom: 16px; }
+    .confirme h2 { font-size: 20px; font-weight: 600; color: #2c2a24; margin-bottom: 8px; }
+    .confirme p { font-size: 14px; color: #888; }
+    .hidden { display: none; }
+    #loading { text-align: center; padding: 60px 20px; color: #aaa; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="cizora-logo">✂ Cizora</div>
+  <span style="font-size:12px;color:#999;">Réservation en ligne</span>
+</nav>
+
+<div class="wrap">
+  <div id="loading">Chargement...</div>
+  <div id="app" class="hidden"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://hcpffoobmquxzgzjxtnk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjcGZmb29ibXF1eHpnempYdG5oayIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzQ2NDU4MjI3LCJleHAiOjIwNjIwMzQyMjd9.TdGpEzBYSEdaRHPuLBFBoN2PNRS6KeHpFGCOFTrCdos';
+
+const SLUG = "recherche-concept-coiffure-f26y";
+const JOURS = ['dim','lun','mar','mer','jeu','ven','sam'];
+const HEURES = ['9h00','9h30','10h00','10h30','11h00','11h30','13h00','13h30','14h00','14h30','15h00','15h30','16h00','16h30'];
+
+let salon, staff, services;
+let staffChoisi = null, serviceChoisi = null, dateChoisie = null, heureChoisie = null;
+let etape = 'service';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function init() {
+  const { data: s } = await sb.from('salons').select('*').eq('slug', SLUG).single();
+  if (!s) { document.getElementById('loading').textContent = 'Salon introuvable.'; return; }
+  salon = s;
+
+  const [{ data: st }, { data: sv }] = await Promise.all([
+    sb.from('staff').select('*').eq('salon_id', salon.id).eq('actif', true).order('ordre'),
+    sb.from('services').select('*').eq('salon_id', salon.id).eq('actif', true).order('ordre'),
+  ]);
+  staff = st || [];
+  services = sv || [];
+
+  const brand = salon.couleur_brand || '#7F77DD';
+  document.documentElement.style.setProperty('--brand', brand);
+  document.documentElement.style.setProperty('--brand-light', brand + '18');
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  render();
+}
+
+function estOuvert() {
+  if (!salon.horaires) return false;
+  return salon.horaires[JOURS[new Date().getDay()]]?.actif ?? false;
+}
+
+function horairesAujourd() {
+  if (!salon.horaires) return '';
+  const h = salon.horaires[JOURS[new Date().getDay()]];
+  return h?.actif ? `${h.ouvert} – ${h.ferme}` : '';
+}
+
+function getJours() {
+  const jours = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const key = JOURS[d.getDay()];
+    if (salon.horaires?.[key]?.actif) jours.push(d);
+  }
+  return jours;
+}
+
+function render() {
+  const app = document.getElementById('app');
+  const ouvert = estOuvert();
+  const brand = salon.couleur_brand || '#7F77DD';
+
+  let logoHTML = salon.logo_url
+    ? `<img class="salon-logo" src="${salon.logo_url}" alt="${salon.nom}" />`
+    : `<div class="salon-initials" style="background:${brand}22;color:${brand}">${salon.nom.charAt(0)}</div>`;
+
+  let html = `
+    <div class="card">
+      <div class="salon-header">
+        ${logoHTML}
+        <div>
+          <div class="salon-name">${salon.nom}</div>
+          ${salon.adresse || salon.ville ? `<div class="salon-addr">📍 ${[salon.adresse, salon.ville].filter(Boolean).join(', ')}</div>` : ''}
+          <span class="badge ${ouvert ? 'badge-open' : 'badge-closed'}">
+            ${ouvert ? `Ouvert · ${horairesAujourd()}` : "Fermé aujourd'hui"}
+          </span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (etape === 'confirme') {
+    html += `
+      <div class="card confirme">
+        <div class="icon">✅</div>
+        <h2>Réservation confirmée !</h2>
+        <p>${serviceChoisi?.nom} · ${dateChoisie} à ${heureChoisie}</p>
+        <p style="margin-top:8px;font-size:13px;color:#aaa;">Merci ! Nous avons hâte de vous accueillir.</p>
+      </div>
+    `;
+  } else if (etape === 'service') {
+    html += `<div class="card">`;
+    if (staff.length > 0) {
+      html += `<div class="section-label">Choisir une coiffeuse</div>
+        <div class="staff-pills">
+          <button class="pill ${!staffChoisi ? 'active' : ''}" onclick="setStaff(null)">Toutes</button>
+          ${staff.map(s => `<button class="pill ${staffChoisi === s.id ? 'active' : ''}" onclick="setStaff('${s.id}')">${s.nom}</button>`).join('')}
+        </div>`;
+    }
+    html += `<div class="section-label">Services</div>`;
+    services.forEach(svc => {
+      html += `
+        <div class="service-row">
+          <div>
+            <div class="svc-name">${svc.nom}</div>
+            <div class="svc-detail">⏱ ${svc.duree_minutes} min${svc.description ? ' · ' + svc.description : ''}</div>
+          </div>
+          <button class="btn" onclick="choisirService('${svc.id}')">Réserver</button>
+        </div>`;
+    });
+    html += `<div class="note-box">Les tarifs varient selon la coiffeuse. Le prix vous sera confirmé lors du rendez-vous.</div>`;
+    html += `</div>`;
+
+  } else if (etape === 'datetime') {
+    const jours = getJours();
+    html += `<div class="card">
+      <button class="btn-back" onclick="setEtape('service')">← Retour</button>
+      <div style="font-size:14px;font-weight:500;color:#2c2a24;margin-bottom:16px;">${serviceChoisi?.nom} · ${serviceChoisi?.duree_minutes} min</div>
+      <div class="section-label">Choisir une date</div>
+      <div class="dates">
+        ${jours.map(d => {
+          const iso = d.toISOString().split('T')[0];
+          const jourLabel = d.toLocaleDateString('fr-CA', {weekday:'short'});
+          return `<button class="date-btn ${dateChoisie === iso ? 'active' : ''}" onclick="setDate('${iso}')">${jourLabel}<br>${d.getDate()}</button>`;
+        }).join('')}
+      </div>
+      ${dateChoisie ? `
+        <div class="section-label">Choisir une heure</div>
+        <div class="heures">
+          ${HEURES.map(h => `<button class="heure-btn ${heureChoisie === h ? 'active' : ''}" onclick="setHeure('${h}')">${h}</button>`).join('')}
+        </div>
+        ${heureChoisie ? `<button class="btn btn-full" onclick="setEtape('info')">Continuer →</button>` : ''}
+      ` : ''}
+    </div>`;
+
+  } else if (etape === 'info') {
+    html += `<div class="card">
+      <button class="btn-back" onclick="setEtape('datetime')">← Retour</button>
+      <div style="font-size:14px;font-weight:500;color:#2c2a24;margin-bottom:4px;">${serviceChoisi?.nom}</div>
+      <div style="font-size:13px;color:#aaa;margin-bottom:20px;">${dateChoisie} à ${heureChoisie}</div>
+      <div class="form-group"><label>Nom complet *</label><input id="f-nom" type="text" /></div>
+      <div class="form-group"><label>Courriel *</label><input id="f-email" type="email" /></div>
+      <div class="form-group"><label>Téléphone</label><input id="f-tel" type="tel" /></div>
+      <div class="form-group"><label>Note (optionnel)</label><textarea id="f-note" rows="3"></textarea></div>
+      <button class="btn btn-full" onclick="confirmer()">Confirmer le rendez-vous</button>
+    </div>`;
+  }
+
+  html += `<div class="footer">✂ Propulsé par <strong>Cizora</strong></div>`;
+  app.innerHTML = html;
+}
+
+function setStaff(id) { staffChoisi = id; render(); }
+function setEtape(e) { etape = e; render(); }
+function setDate(d) { dateChoisie = d; heureChoisie = null; render(); }
+function setHeure(h) { heureChoisie = h; render(); }
+
+function choisirService(id) {
+  serviceChoisi = services.find(s => s.id === id);
+  etape = 'datetime';
+  render();
+}
+
+async function confirmer() {
+  const nom = document.getElementById('f-nom').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const tel = document.getElementById('f-tel').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+  if (!nom || !email) { alert('Veuillez remplir votre nom et courriel.'); return; }
+
+  const [h, m] = heureChoisie.replace('h',':').split(':');
+  const debut = new Date(`${dateChoisie}T${h.padStart(2,'0')}:${(m||'00').padStart(2,'0')}:00`);
+  const fin = new Date(debut.getTime() + serviceChoisi.duree_minutes * 60000);
+
+  await sb.from('rendez_vous').insert({
+    salon_id: salon.id,
+    staff_id: staffChoisi || (staff[0]?.id),
+    service_id: serviceChoisi.id,
+    client_nom: nom,
+    client_email: email,
+    client_telephone: tel,
+    notes: note,
+    debut: debut.toISOString(),
+    fin: fin.toISOString(),
+    statut: 'confirme',
+    source: 'en_ligne',
+  });
+
+  etape = 'confirme';
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
